@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Controle de Estoque</title>
+<style>
+  /* CSS original igual ao seu */
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0; padding: 0;
+    background: #f0f0f0;
+    color: #333;
+  }
+  header {
+    background: #005f73;
+    color: white;
+    padding: 1rem;
+    text-align: center;
+  }
+  main {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem;
+  }
+  section {
+    background: white;
+    padding: 1rem;
+    border-radius: 6px;
+    box-shadow: 0 0 5px #aaa;
+    flex: 1;
+    overflow-y: auto;
+    max-height: 80vh;
+  }
+  h2 {
+    margin-top: 0;
+    font-size: 1.2rem;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  th, td {
+    border: 1px solid #ccc;
+    padding: 6px 8px;
+    text-align: center;
+  }
+  th {
+    background: #94d2bd;
+  }
+  .quantidade-ok {
+    background-color: #d4edda;
+    color: #155724;
+  }
+  .quantidade-falta {
+    background-color: #f8d7da;
+    color: #721c24;
+  }
+  input[type=number] {
+    width: 60px;
+  }
+  input[type=text] {
+    width: 100%;
+  }
+  button {
+    cursor: pointer;
+    padding: 6px 10px;
+    border: none;
+    border-radius: 4px;
+    background: #0a9396;
+    color: white;
+    transition: background 0.3s;
+  }
+  button:hover {
+    background: #005f73;
+  }
+  .btn-danger {
+    background: #bb3e03;
+  }
+  .btn-danger:hover {
+    background: #7a2700;
+  }
+  .form-inline {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  .obra-item {
+    cursor: pointer;
+    padding: 4px;
+    border-bottom: 1px solid #ddd;
+  }
+  .obra-item:hover, .obra-item.active {
+    background: #94d2bd;
+    color: white;
+  }
+  .modal-bg {
+    position: fixed;
+    top:0; left:0; right:0; bottom:0;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    justify-content: center;
+    align-items: center;
+  }
+  .modal {
+    background: white;
+    padding: 1rem;
+    border-radius: 6px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .close-btn {
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 1.2rem;
+    border: none;
+    background: none;
+  }
+  .small-input {
+    width: 50px;
+  }
+  .select-unit {
+    width: 80px;
+  }
+  #busca-material, #busca-obra {
+    width: 100%;
+    margin-bottom: 0.5rem;
+    padding: 6px;
+    font-size: 0.9rem;
+    box-sizing: border-box;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Controle de Estoque</h1>
+</header>
+
+<main>
+  <section id="materiais-section">
+    <h2>Materiais</h2>
+    <input type="text" id="busca-material" placeholder="Buscar material por código ou nome..." oninput="filtrarMateriais()" />
+    <div style="margin-bottom: 0.5rem;">
+      <button onclick="mostrarFormMaterial()">+ Adicionar Material</button>
+    </div>
+    <table id="materiais-table">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Nome</th>
+          <th>Quantidade Atual</th>
+          <th>Unidade</th>
+          <th>Qtd Chegou</th>
+          <th>Qtd Saiu</th>
+          <th>Obra</th>
+          <th>Qtd Voltou</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section id="obras-section" style="max-width: 300px;">
+    <h2>Obras</h2>
+    <input type="text" id="busca-obra" placeholder="Buscar obra pelo nome..." oninput="filtrarObras()" />
+    <div style="margin-bottom: 0.5rem;">
+      <button onclick="mostrarFormObra()">+ Nova Obra</button>
+    </div>
+    <div id="lista-obras"></div>
+  </section>
+</main>
+
+<!-- Modais (iguais ao seu original) -->
+<div id="modal-material" class="modal-bg">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-material-title">Adicionar Material</h3>
+      <button class="close-btn" onclick="fecharModalMaterial()">×</button>
+    </div>
+    <form id="form-material" onsubmit="salvarMaterial(event)">
+      <div class="form-inline">
+        <label for="codigo-material">Código:</label>
+        <input type="text" id="codigo-material" required />
+      </div>
+      <div class="form-inline">
+        <label for="nome-material">Nome:</label>
+        <input type="text" id="nome-material" required />
+      </div>
+      <div class="form-inline">
+        <label for="quantidade-material">Quantidade Atual:</label>
+        <input type="number" id="quantidade-material" min="0" step="0.01" required />
+      </div>
+      <div class="form-inline">
+        <label for="unidade-material">Unidade:</label>
+        <select id="unidade-material" class="select-unit" required>
+          <option value="m">m</option>
+          <option value="kg">kg</option>
+          <option value="peça">peça</option>
+        </select>
+      </div>
+      <input type="hidden" id="material-edit-id" />
+      <div style="margin-top: 1rem; text-align: right;">
+        <button type="submit">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="modal-obra" class="modal-bg">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-obra-title">Nova Obra</h3>
+      <button class="close-btn" onclick="fecharModalObra()">×</button>
+    </div>
+    <form id="form-obra" onsubmit="salvarObra(event)">
+      <div class="form-inline">
+        <label for="nome-obra">Nome da Obra:</label>
+        <input type="text" id="nome-obra" required />
+      </div>
+      <input type="hidden" id="obra-edit-id" />
+      <div style="margin-top: 1rem; text-align: right;">
+        <button type="submit">Salvar</button>
+      </div>
+    </form>
+    <hr />
+    <h4>Materiais usados na obra:</h4>
+    <table id="detalhes-obra-table" style="font-size: 0.85rem; width: 100%;">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Nome</th>
+          <th>Qtd Usada</th>
+          <th>Qtd Voltou</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div style="margin-top: 1rem; text-align: right;">
+      <button class="btn-danger" onclick="excluirObraConfirm()">Excluir Obra</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+import { getDatabase, ref, set, onValue, push, update, remove, get } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js";
+
+// Configuração Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyCs1vNxUfOb8TsnsNSn0oxG1b10ThiGAMo",
+  authDomain: "estoque-2-9d0ab.firebaseapp.com",
+  databaseURL: "https://estoque-2-9d0ab-default-rtdb.firebaseio.com",
+  projectId: "estoque-2-9d0ab",
+  storageBucket: "estoque-2-9d0ab.appspot.com",
+  messagingSenderId: "297905672796",
+  appId: "1:297905672796:web:435489fe41e931ea988c99"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+let materiais = [];
+let obras = [];
+let obraSelecionada = null;
+
+const materiaisRef = ref(db, 'materiais');
+const obrasRef = ref(db, 'obras');
+
+// --- Atualizar local ao receber dados ---
+onValue(materiaisRef, (snapshot) => {
+  materiais = snapshot.val() ? Object.values(snapshot.val()) : [];
+  filtrarMateriais();
+});
+
+onValue(obrasRef, (snapshot) => {
+  obras = snapshot.val() ? Object.values(snapshot.val()) : [];
+  filtrarObras();
+});
+
+// --- Helpers Firebase ---
+function salvarMateriais() {
+  const obj = {};
+  materiais.forEach((mat) => obj[mat.id] = mat);
+  set(materiaisRef, obj);
+}
+
+function salvarObras() {
+  const obj = {};
+  obras.forEach((o) => obj[o.id] = o);
+  set(obrasRef, obj);
+}
+
+// --- Filtrar e renderizar Materiais ---
+window.filtrarMateriais = function () {
+  const filtro = document.getElementById('busca-material').value.toLowerCase();
+  const tbody = document.querySelector('#materiais-table tbody');
+  tbody.innerHTML = '';
+
+  materiais.forEach((mat, idx) => {
+    if (
+      mat.codigo.toLowerCase().includes(filtro) ||
+      mat.nome.toLowerCase().includes(filtro)
+    ) {
+      let classeQtd = mat.quantidadeAtual > 0 ? 'quantidade-ok' : 'quantidade-falta';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${mat.codigo}</td>
+        <td>${mat.nome}</td>
+        <td class="${classeQtd}">${mat.quantidadeAtual.toFixed(2)}</td>
+        <td>${mat.unidade}</td>
+        <td><input type="number" min="0" step="0.01" id="chegou-${idx}" placeholder="0" /></td>
+        <td><input type="number" min="0" step="0.01" id="saiu-${idx}" placeholder="0" /></td>
+        <td>
+          <select id="obra-select-${idx}">
+            <option value="">---</option>
+            ${obras.map(o => `<option value="${o.id}">${o.nome}</option>`).join('')}
+          </select>
+        </td>
+        <td><input type="number" min="0" step="0.01" id="voltou-${idx}" placeholder="0" /></td>
+        <td>
+          <button onclick="editarMaterial(${idx})">Editar</button>
+          <button onclick="excluirMaterial(${idx})" class="btn-danger">Excluir</button>
+          <button onclick="aplicarMovimentacao(${idx})">Aplicar</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    }
+  });
+};
+
+// --- Filtrar e renderizar Obras ---
+window.filtrarObras = function () {
+  const filtro = document.getElementById('busca-obra').value.toLowerCase();
+  const container = document.getElementById('lista-obras');
+  container.innerHTML = '';
+
+  obras.forEach(obra => {
+    if (obra.nome.toLowerCase().includes(filtro)) {
+      const div = document.createElement('div');
+      div.classList.add('obra-item');
+      if (obraSelecionada && obra.id === obraSelecionada.id) div.classList.add('active');
+      div.textContent = obra.nome;
+      div.onclick = () => {
+        obraSelecionada = obra;
+        filtrarObras();
+        mostrarDetalhesObra(obra.id);
+        mostrarFormObra(obra.id);
+      };
+      container.appendChild(div);
+    }
+  });
+};
+
+// --- Aplicar movimentação ---
+window.aplicarMovimentacao = function (idx) {
+  const mat = materiais[idx];
+  const inputChegou = document.getElementById(`chegou-${idx}`);
+  const inputSaiu = document.getElementById(`saiu-${idx}`);
+  const inputVoltou = document.getElementById(`voltou-${idx}`);
+  const selectObra = document.getElementById(`obra-select-${idx}`);
+
+  let chegou = parseFloat(inputChegou.value) || 0;
+  let saiu = parseFloat(inputSaiu.value) || 0;
+  let voltou = parseFloat(inputVoltou.value) || 0;
+  let obraId = selectObra.value;
+
+  if (!obraId && (saiu > 0 || voltou > 0)) {
+    alert('Selecione uma obra para saída ou retorno.');
+    return;
+  }
+
+  mat.quantidadeAtual += chegou;
+
+  if (saiu > mat.quantidadeAtual) {
+    alert('Quantidade que saiu maior que disponível.');
+    return;
+  }
+  mat.quantidadeAtual -= saiu;
+
+  if (voltou > 0) {
+    mat.quantidadeAtual += voltou;
+  }
+
+  if (obraId) {
+    const obra = obras.find(o => o.id === obraId);
+    if (!obra.materiais) obra.materiais = [];
+
+    let matObra = obra.materiais.find(mo => mo.codigo === mat.codigo);
+    if (!matObra) {
+      matObra = { codigo: mat.codigo, nome: mat.nome, qtdUsada: 0, qtdVoltou: 0 };
+      obra.materiais.push(matObra);
+    }
+
+    if (saiu > 0) matObra.qtdUsada += saiu;
+    if (voltou > 0) {
+      matObra.qtdVoltou += voltou;
+      matObra.qtdUsada -= voltou;
+      if (matObra.qtdUsada < 0) matObra.qtdUsada = 0;
+    }
+  }
+
+  salvarMateriais();
+  salvarObras();
+
+  inputChegou.value = '';
+  inputSaiu.value = '';
+  inputVoltou.value = '';
+  selectObra.value = '';
+
+  if (obraSelecionada && obraSelecionada.id === obraId) {
+    mostrarDetalhesObra(obraSelecionada.id);
+  }
+};
+
+// --- Adicionar/Editar Material ---
+window.mostrarFormMaterial = function (editIdx = null) {
+  document.getElementById('modal-material').style.display = 'flex';
+  document.getElementById('form-material').reset();
+  document.getElementById('material-edit-id').value = '';
+
+  document.getElementById('modal-material-title').innerText = 'Adicionar Material';
+  if (editIdx !== null) {
+    const mat = materiais[editIdx];
+    document.getElementById('codigo-material').value = mat.codigo;
+    document.getElementById('nome-material').value = mat.nome;
+    document.getElementById('quantidade-material').value = mat.quantidadeAtual;
+    document.getElementById('unidade-material').value = mat.unidade;
+    document.getElementById('material-edit-id').value = editIdx;
+    document.getElementById('modal-material-title').innerText = 'Editar Material';
+  }
+};
+
+window.fecharModalMaterial = function () {
+  document.getElementById('modal-material').style.display = 'none';
+};
+
+window.salvarMaterial = function (event) {
+  event.preventDefault();
+  const codigo = document.getElementById('codigo-material').value.trim();
+  const nome = document.getElementById('nome-material').value.trim();
+  const quantidadeAtual = parseFloat(document.getElementById('quantidade-material').value);
+  const unidade = document.getElementById('unidade-material').value;
+  const editId = document.getElementById('material-edit-id').value;
+
+  if (editId !== '') {
+    materiais[editId].codigo = codigo;
+    materiais[editId].nome = nome;
+    materiais[editId].quantidadeAtual = quantidadeAtual;
+    materiais[editId].unidade = unidade;
+  } else {
+    materiais.push({
+      id: gerarId(),
+      codigo,
+      nome,
+      quantidadeAtual,
+      unidade
+    });
+  }
+  salvarMateriais();
+  fecharModalMaterial();
+};
+
+window.editarMaterial = function (idx) {
+  mostrarFormMaterial(idx);
+};
+
+window.excluirMaterial = function (idx) {
+  if (!confirm('Deseja realmente excluir este material?')) return;
+  const matId = materiais[idx].id;
+  obras.forEach(obra => {
+    if (obra.materiais) {
+      obra.materiais = obra.materiais.filter(m => m.codigo !== materiais[idx].codigo);
+    }
+  });
+  materiais.splice(idx, 1);
+  salvarMateriais();
+  salvarObras();
+};
+
+// --- Obras ---
+function gerarId() {
+  return '_' + Math.random().toString(36).substr(2, 9);
+}
+
+window.mostrarFormObra = function (editId = null) {
+  document.getElementById('modal-obra').style.display = 'flex';
+  document.getElementById('form-obra').reset();
+  document.getElementById('obra-edit-id').value = '';
+  document.getElementById('modal-obra-title').innerText = 'Nova Obra';
+  document.querySelector('#detalhes-obra-table tbody').innerHTML = '';
+
+  if (editId) {
+    const obra = obras.find(o => o.id === editId);
+    if (!obra) return alert('Obra não encontrada');
+    obraSelecionada = obra;
+    document.getElementById('nome-obra').value = obra.nome;
+    document.getElementById('obra-edit-id').value = editId;
+    document.getElementById('modal-obra-title').innerText = 'Editar Obra';
+    mostrarDetalhesObra(editId);
+  } else {
+    obraSelecionada = null;
+  }
+};
+
+window.fecharModalObra = function () {
+  document.getElementById('modal-obra').style.display = 'none';
+  obraSelecionada = null;
+};
+
+window.salvarObra = function (event) {
+  event.preventDefault();
+  const nome = document.getElementById('nome-obra').value.trim();
+  const editId = document.getElementById('obra-edit-id').value;
+
+  if (editId) {
+    const obra = obras.find(o => o.id === editId);
+    obra.nome = nome;
+  } else {
+    obras.push({
+      id: gerarId(),
+      nome,
+      materiais: []
+    });
+  }
+  salvarObras();
+  fecharModalObra();
+};
+
+window.mostrarDetalhesObra = function (id) {
+  const obra = obras.find(o => o.id === id);
+  const tbody = document.querySelector('#detalhes-obra-table tbody');
+  tbody.innerHTML = '';
+
+  if (!obra.materiais || obra.materiais.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center">Nenhum material usado nessa obra.</td></tr>';
+    return;
+  }
+
+  obra.materiais.forEach(matObra => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${matObra.codigo}</td>
+      <td>${matObra.nome}</td>
+      <td>${matObra.qtdUsada.toFixed(2)}</td>
+      <td>${matObra.qtdVoltou.toFixed(2)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+};
+
+window.excluirObraConfirm = function () {
+  if (!obraSelecionada) return;
+  if (!confirm(`Deseja realmente excluir a obra "${obraSelecionada.nome}"?`)) return;
+  obras = obras.filter(o => o.id !== obraSelecionada.id);
+  obraSelecionada = null;
+  salvarObras();
+  fecharModalObra();
+};
+
+</script>
+
+
+
+</body>
+</html>
